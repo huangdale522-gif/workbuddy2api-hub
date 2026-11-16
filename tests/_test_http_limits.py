@@ -142,8 +142,10 @@ class NagleFlagTests(unittest.TestCase):
             server.shutdown()
             server.server_close()
             thread.join(timeout=5)
-        self.assertEqual(Probe.seen, [1],
-                         "TCP_NODELAY is not set on the accepted connection")
+        # Darwin returns the kernel's TCP_NODELAY value (4) while Linux
+        # returns 1.  The contract is "enabled", not one platform's number.
+        self.assertTrue(Probe.seen and Probe.seen[0],
+                        "TCP_NODELAY is not set on the accepted connection")
 
 
 class BacklogTests(unittest.TestCase):

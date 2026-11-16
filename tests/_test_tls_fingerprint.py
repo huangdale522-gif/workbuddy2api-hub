@@ -559,7 +559,10 @@ class TLSFingerprintTests(unittest.TestCase):
             fields = parse_client_hello(capture_client_hello(context))
 
         self.assertEqual(fields["legacy_version"], 0x0303)
-        self.assertEqual(fields["session_id_length"], 32)
+        # LibreSSL (the macOS system Python build) omits the legacy session-id
+        # placeholder unless a session cache is active; OpenSSL sends 32 bytes.
+        # Both still use the stdlib verification context this test guards.
+        self.assertIn(fields["session_id_length"], (0, 32))
         self.assertTrue(fields["ciphers"])
         self.assertTrue(context.check_hostname)
         self.assertEqual(context.verify_mode, ssl.CERT_REQUIRED)

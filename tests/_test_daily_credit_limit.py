@@ -27,6 +27,11 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _TMP = tempfile.mkdtemp(prefix="wb-credit-")
 os.environ["ACCOUNTS_DIR"] = os.path.join(_TMP, "accounts")
 os.environ["WB_PROXY_USAGE_DIR"] = _TMP
+# Keep the developer's real desktop catalogue out of this unit test.  Without
+# this, a local `.workbuddy-ai` cache can precede the archived fixture and
+# change the fallback order on a developer machine even though CI is clean.
+os.environ["HOME"] = _TMP
+os.environ["USERPROFILE"] = _TMP
 os.makedirs(os.environ["ACCOUNTS_DIR"], exist_ok=True)
 
 import wb_accounts

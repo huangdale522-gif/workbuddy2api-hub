@@ -1,13 +1,15 @@
 # 续维护说明
 
-本仓库是 `workbuddy2api-hub` 的社区续维护分支，维护基线与原作者最后公开的稳定版一致：
+本仓库是 `workbuddy2api-hub` 的社区续维护分支，当前源码已同步原作者迁移后的稳定版：
 
-- 基线版本：`v2.1.1`
-- 基线提交：`f5f15d33d401e590b3869017beb480a54a91de7a`
-- 原项目：`ardeyouxipianyi/workbuddy2api-hub`
+- 当前同步版本：`v2.1.3`
+- 当前同步提交：`5a95e48859930a0a68e6047025a39fd8142128ad`
+- 历史基线：`v2.1.1` / `f5f15d33d401e590b3869017beb480a54a91de7a`
+- 迁移后的上游：`niyouqianma/workbuddy2api-hub`
+- 历史原地址：`ardeyouxipianyi/workbuddy2api-hub`（当前不可访问）
 - 续维护仓库：`huangdale522-gif/workbuddy2api-hub`
 
-原作者的上游公开仓库目前已不可访问。本仓库保留原项目的 MIT 许可、作者署名、变更记录与贡献者致谢，但不再声称自己是原作者官方发布物。
+原作者迁移了公开仓库。本仓库保留原项目的 MIT 许可、作者署名、变更记录与贡献者致谢，但不再声称自己是原作者官方发布物；续维护改动与上游同步必须逐提交审查。
 
 ## 维护原则
 
@@ -25,6 +27,16 @@
 3. 推送 `vX.Y.Z` 标签，等待 `release` 工作流生成 Draft Release。
 4. 检查发布说明与资产，手动 Publish Release。
 5. `Publish Docker image` 工作流会推送 `ghcr.io/huangdale522-gif/workbuddy2api-hub:vX.Y.Z` 和 `:latest`。
+
+真实实例的核心接口探测可用：
+
+```bash
+python scripts/probe_core_interfaces.py \
+  --base-url http://127.0.0.1:8788 \
+  --accounts-dir ./accounts
+```
+
+默认不提交生图或生视频；只有显式传 `--spend-image` / `--spend-video` 才会产生媒体积分。面板接口需要额外传 `--panel-password`，批量账号测试需要再加 `--test-accounts`。
 
 `Publish Docker image` 也支持手动运行，只生成 `:edge` 和 `:sha-*` 测试镜像，不会覆盖稳定版 `:latest`。
 
