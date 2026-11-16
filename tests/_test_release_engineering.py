@@ -61,6 +61,28 @@ class DockerTests(unittest.TestCase):
         self.assertIn("${PUID:-", text)
         self.assertIn("${PGID:-", text)
 
+    def test_compose_uses_continuation_image_and_persists_subbridge(self):
+        text = read("docker-compose.yml")
+        self.assertIn("ghcr.io/huangdale522-gif/workbuddy2api-hub", text)
+        self.assertIn("./subbridge-data:/app/subbridge-data", text)
+        self.assertNotIn("ghcr.io/ardeyouxipianyi/workbuddy2api-hub", text)
+
+
+class ContinuationTests(unittest.TestCase):
+    def test_update_sources_point_to_continuation_repository(self):
+        expected = "huangdale522-gif/workbuddy2api-hub"
+        self.assertIn(expected, read("wb_updates.py"))
+        self.assertIn(expected, read("wb_update_portable.py"))
+        self.assertIn(expected, read("quick-deploy.sh"))
+        self.assertIn(expected, read("README.md"))
+
+    def test_docker_workflow_keeps_manual_edge_builds_away_from_latest(self):
+        text = read(".github", "workflows", "docker-publish.yml")
+        self.assertIn("workflow_dispatch:", text)
+        self.assertIn("tag=edge", text)
+        self.assertIn("type=sha,prefix=sha-", text)
+        self.assertIn("github.event_name == 'release' && !github.event.release.prerelease", text)
+
 
 class ReadmeTests(unittest.TestCase):
     def test_readme_suite_count_matches_the_tree(self):

@@ -1,7 +1,10 @@
 # WorkBuddy2API-Hub — 国际版、国内版多账号网关中枢
 
 > [!IMPORTANT]
-> **官方群聊**：[https://t.me/wb2apihub](https://t.me/wb2apihub)
+> **社区续维护分支**：本仓库以原作者最后公开的 `v2.1.1`（提交 `f5f15d3`）为基线继续维护。原作者上游公开仓库目前已不可访问；本仓库保留 MIT 许可、原作者署名和全部贡献者致谢，但不代表原作者官方发布。维护、发布与回滚规则见 [`MAINTENANCE.md`](MAINTENANCE.md)。
+
+> [!IMPORTANT]
+> **原作者社区群聊（历史入口，非本分支支持渠道）**：[https://t.me/wb2apihub](https://t.me/wb2apihub)
 >
 > **凭证安全**：本项目是本地部署网关，运行时需要在本地读取用户自行导入的账号凭证，才能调用官方接口；凭证保存在用户自己的 `accounts/` 目录。项目不会把凭证上传到本项目的第三方服务器，也没有隐藏的凭证收集或上传逻辑。请立即关闭公网暴露，联系官方吊销全部 OAuth / 设备授权，确认旧 token 返回 `401` 后再重新授权。
 
@@ -9,23 +12,23 @@
 > **WorkBuddy 上游正在收紧对非官方客户端的识别与拦截。**
 >
 > - **封禁**：2026-10-23 下午起，非官方客户端的识别与拦截明显收紧。
-> - **维护者**：近期工作压力增大，无法保证及时更新与响应。
+> - **维护状态**：原作者上游公开仓库目前已不可访问，本仓库由社区按原有测试与发布门禁继续维护。
 > - **可用性**：上游可能随时进一步收紧，导致本项目不可用。
 > - **账号风险**：使用非官方客户端造成的风控、限流或封禁，由使用者自行承担。
 >
-> **Upstream enforcement** tightened detection and blocking of unofficial clients from the afternoon of 2026-10-23. The maintainer is under increased workload and cannot guarantee timely updates or replies. The upstream may tighten further at any time; rate limits, account restrictions or bans caused by using an unofficial client are the user's responsibility.
+> **Upstream enforcement** tightened detection and blocking of unofficial clients from the afternoon of 2026-10-23. The original public upstream is currently unavailable; this community continuation keeps the original test and release gates. The upstream may tighten further at any time; rate limits, account restrictions or bans caused by using an unofficial client are the user's responsibility.
 
 本项目仅用于协议学习、研究与个人自用。请优先使用官方客户端，不要使用主账号，不要共享账号，也不要用于商业转售。
 
 This project is for protocol research and personal use only. Prefer the official client, do not use your primary account, and do not resell or share access.
 
 <p align="center">
-  <a href="https://github.com/ardeyouxipianyi/workbuddy2api-hub/releases"><img src="https://img.shields.io/badge/Release-v2.1.1-2496ED?style=flat-square" alt="Version 2.1.1"></a>
+  <a href="https://github.com/huangdale522-gif/workbuddy2api-hub/releases"><img src="https://img.shields.io/badge/Release-v2.1.2-2496ED?style=flat-square" alt="Version 2.1.2"></a>
   <img src="https://img.shields.io/badge/Python-3.9+-blue.svg?style=flat-square" alt="Python">
   <img src="https://img.shields.io/badge/API-OpenAI_Compatible-412991?style=flat-square" alt="OpenAI API">
   <img src="https://img.shields.io/badge/Dual_Realm-Intl_&_CN-0DBD8B?style=flat-square" alt="Dual Realm">
   <img src="https://img.shields.io/badge/License-MIT-green.svg?style=flat-square" alt="License">
-  <img src="https://img.shields.io/badge/Maintenance-Resumed-0DBD8B?style=flat-square" alt="Maintenance resumed">
+  <img src="https://img.shields.io/badge/Maintenance-Community_Continuation-0DBD8B?style=flat-square" alt="Community continuation">
 </p>
 
 ## 核心特性
@@ -47,9 +50,9 @@ This project is for protocol research and personal use only. Prefer the official
 
 ---
 
-## 💖 赞助商
+## 原作者赞助商（历史信息）
 
-> 想出现在这里？联系 [ardeyouxipianyi@gmail.com](mailto:ardeyouxipianyi@gmail.com)
+> 以下内容保留自原作者 `v2.1.1` README，仅作来源说明；本续维护分支未参与该赞助关系。
 
 <table>
 <tr>
@@ -81,11 +84,11 @@ This project is for protocol research and personal use only. Prefer the official
 **方式一：一键脚本（推荐）**
 
 ```bash
-# 官方源（直连 GitHub 环境）：
-curl -fsSL https://raw.githubusercontent.com/ardeyouxipianyi/workbuddy2api-hub/main/quick-deploy.sh | bash
+# 续维护仓库源（直连 GitHub 环境）：
+curl -fsSL https://raw.githubusercontent.com/huangdale522-gif/workbuddy2api-hub/main/quick-deploy.sh | bash
 
 # 国内网络 / NAS 加速：
-curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/ardeyouxipianyi/workbuddy2api-hub/main/quick-deploy.sh | sudo bash
+curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/huangdale522-gif/workbuddy2api-hub/main/quick-deploy.sh | sudo bash
 ```
 
 > 公网部署或配合反向代理：在管道前指定 `WB_DEPLOY_MODE=public bash`，并搭配 Nginx / Caddy / Cloudflare Tunnel 配置 TLS。
@@ -95,7 +98,7 @@ curl -fsSL https://gh-proxy.com/https://raw.githubusercontent.com/ardeyouxipiany
 ```yaml
 services:
   wb-proxy:
-    image: ghcr.io/ardeyouxipianyi/workbuddy2api-hub:latest
+    image: ghcr.io/huangdale522-gif/workbuddy2api-hub:latest
     container_name: wb-proxy
     restart: unless-stopped
     ports:
@@ -107,6 +110,7 @@ services:
     volumes:
       - ./accounts:/app/accounts    # 账号凭据与配置（持久化）
       - ./usage:/app/usage          # 用量流水日志（持久化）
+      - ./subbridge-data:/app/subbridge-data  # 订阅桥数据（持久化）
 ```
 
 更新镜像：`docker compose pull && docker compose up -d`。
@@ -293,7 +297,7 @@ python tests/run_all.py realm      # 只跑名字里含 realm 的
 ## ⭐ Star 趋势
 
 <p align="center">
-  <a href="https://star-history.com/#ardeyouxipianyi/workbuddy2api-hub&Date">
-    <img src="https://api.star-history.com/svg?repos=ardeyouxipianyi/workbuddy2api-hub&type=Date" alt="Star History Chart" width="760">
+  <a href="https://star-history.com/#huangdale522-gif/workbuddy2api-hub&Date">
+    <img src="https://api.star-history.com/svg?repos=huangdale522-gif/workbuddy2api-hub&type=Date" alt="Star History Chart" width="760">
   </a>
 </p>
