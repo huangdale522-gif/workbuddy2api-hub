@@ -132,16 +132,22 @@ class Report(object):
     def __init__(self):
         self.rows = []
 
-    def add(self, scope, name, status, elapsed, detail="", expected=False):
+    def add(self, scope, name, status, elapsed, detail="", expected=False,
+            expected_status=None):
         ok = status is not None and 200 <= status < 300
-        if expected:
+        if expected_status is not None:
+            statuses = ((expected_status,) if isinstance(expected_status, int)
+                        else tuple(expected_status))
+            ok = status in statuses
+            expected = True
+        elif expected:
             ok = status is not None and 400 <= status < 500
         self.rows.append({
             "scope": scope, "name": name, "status": status,
             "ok": ok, "expected": expected, "elapsed": round(elapsed, 3),
             "detail": detail,
         })
-        marker = "PASS" if ok else ("EXPECTED" if expected else "FAIL")
+        marker = "PASS" if ok else "FAIL"
         print("  [%s] %-32s HTTP %-3s %7.2fs %s" % (
             marker, name, status if status is not None else "-", elapsed,
             detail[:160]))
@@ -348,8 +354,8 @@ def probe_panel(report, base, password, test_accounts=False, timeout=60):
 
     status, body, elapsed = panel_get("/codearts/overview")
     report.add("panel", "codearts/overview", status, elapsed,
-               "503 is expected when CodeArts is not configured",
-               expected=(status == 503))
+               "200 when configured; 503 when CodeArts is not configured",
+               expected_status=(200, 503))
 
     if test_accounts:
         # This is an explicit opt-in because it sends a small request through
