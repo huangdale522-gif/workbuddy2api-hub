@@ -3,7 +3,7 @@
 # WorkBuddy2API-Hub 一键安装与快速更新脚本
 # 支持系统: Linux, macOS, NAS (fnOS / 群晖 / 威联通 / Unraid 等)
 # 用法:
-#   首次部署: curl -fsSL https://raw.githubusercontent.com/ardeyouxipianyi/workbuddy2api-hub/main/quick-deploy.sh | bash
+#   首次部署: curl -fsSL https://raw.githubusercontent.com/huangdale522-gif/workbuddy2api-hub/main/quick-deploy.sh | bash
 #   快速更新: 再次运行相同的命令即可完成平滑无感升级（账号配置绝不丢失）
 #   部署模式: WB_DEPLOY_MODE=local|lan|public（默认 lan）
 #             local/public 只把 8788 绑到 127.0.0.1，公网机请再套 Nginx/Caddy/Tunnel
@@ -17,6 +17,8 @@ BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
+CONTINUATION_IMAGE="ghcr.io/huangdale522-gif/workbuddy2api-hub"
+LEGACY_IMAGE="ghcr.io/ardeyouxipianyi/workbuddy2api-hub"
 
 echo -e "\n${BLUE}======================================================${NC}"
 echo -e "${GREEN}   WorkBuddy2API-Hub Docker 一键部署与更新脚本${NC}"
@@ -73,6 +75,16 @@ fi
 # 3. 首次安装 vs 更新判断
 if [ -f "docker-compose.yml" ]; then
     echo -e "${YELLOW}[升级模式] 检测到已有部署，正在拉取最新镜像进行平滑更新...${NC}"
+    if grep -Fq "${LEGACY_IMAGE}" docker-compose.yml; then
+        COMPOSE_BACKUP="docker-compose.yml.bak-continuation-$(date +%Y%m%d-%H%M%S)"
+        cp -p docker-compose.yml "${COMPOSE_BACKUP}"
+        sed "s|${LEGACY_IMAGE}|${CONTINUATION_IMAGE}|g" docker-compose.yml > docker-compose.yml.continuation.tmp
+        mv docker-compose.yml.continuation.tmp docker-compose.yml
+        echo -e "${YELLOW}[迁移] 镜像源已切换到续维护仓库，原配置备份为: ${COMPOSE_BACKUP}${NC}"
+    fi
+    if ! grep -Fq "/app/subbridge-data" docker-compose.yml; then
+        echo -e "${YELLOW}[提示] 当前 Compose 未显式挂载 subbridge-data；如使用订阅桥，请补上 ./subbridge-data:/app/subbridge-data。${NC}"
+    fi
     if [ -n "${WB_DEPLOY_MODE:-}" ]; then
         echo -e "${YELLOW}[提示] 已有部署不会自动改写端口映射；如需限制监听地址，请手动编辑 docker-compose.yml 的 ports。${NC}"
     fi
@@ -84,7 +96,7 @@ else
     cat > docker-compose.yml << EOF
 services:
   wb-proxy:
-    image: ghcr.io/ardeyouxipianyi/workbuddy2api-hub:latest
+    image: ${CONTINUATION_IMAGE}:latest
     container_name: wb-proxy
     restart: unless-stopped
     ports:
@@ -97,8 +109,9 @@ services:
     volumes:
       - ./accounts:/app/accounts
       - ./usage:/app/usage
+      - ./subbridge-data:/app/subbridge-data
 EOF
-    mkdir -p accounts usage
+    mkdir -p accounts usage subbridge-data
     echo -e "${BLUE}[信息] 正在拉取镜像并启动容器...${NC}"
     $COMPOSE_CMD up -d
     echo -e "\n${GREEN}[成功] WorkBuddy2API-Hub 首次部署成功！${NC}"

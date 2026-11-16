@@ -23,7 +23,7 @@
 ```yaml
 services:
   wb-proxy:
-    image: ghcr.io/ardeyouxipianyi/workbuddy2api-hub:latest
+    image: ghcr.io/huangdale522-gif/workbuddy2api-hub:latest
     volumes:
       - ./accounts:/app/accounts
       - ./usage:/app/usage

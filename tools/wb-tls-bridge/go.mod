@@ -1,4 +1,4 @@
-module github.com/ardeyouxipianyi/workbuddy2api-hub/tools/wb-tls-bridge
+module github.com/huangdale522-gif/workbuddy2api-hub/tools/wb-tls-bridge
 
 go 1.24
 

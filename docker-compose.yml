@@ -4,13 +4,13 @@
 services:
   wb-proxy:
     # 追最新稳定版用 :latest；想固定版本可换成具体版本号（如 :v1.6.11）
-    image: ghcr.io/ardeyouxipianyi/workbuddy2api-hub:latest
+    image: ghcr.io/huangdale522-gif/workbuddy2api-hub:latest
     container_name: wb-proxy
     restart: unless-stopped
     # Defaults to root (0:0), i.e. the historical behaviour. To run as your own
     # host user instead, set PUID/PGID (e.g. PUID=$(id -u) PGID=$(id -g)
-    # docker compose up -d) and make sure ./accounts and ./usage are writable
-    # by that uid; see the README's Docker section.
+    # docker compose up -d) and make sure ./accounts, ./usage and
+    # ./subbridge-data are writable by that uid; see the README's Docker section.
     user: "${PUID:-0}:${PGID:-0}"
     ports:
       # 宿主机端口:容器端口（右侧必须与下面的 PORT 保持一致）
@@ -28,6 +28,7 @@ services:
       # 持久化数据目录：升级与重建容器时绝不丢失配置与用量
       - ./accounts:/app/accounts
       - ./usage:/app/usage
+      - ./subbridge-data:/app/subbridge-data
 
   # 可选：Watchtower 自动静默更新服务（取消注释即可开启）
   # 每天自动检查镜像更新，拉取新版本并优雅重启 wb-proxy

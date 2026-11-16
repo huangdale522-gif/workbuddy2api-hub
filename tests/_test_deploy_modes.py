@@ -42,6 +42,12 @@ class DeployModeTests(unittest.TestCase):
     def test_upgrade_does_not_rewrite_an_existing_compose(self):
         self.assertIn("已有部署不会自动改写端口映射", self.script)
 
+    def test_upgrade_migrates_only_the_legacy_image_source(self):
+        self.assertIn('LEGACY_IMAGE="ghcr.io/ardeyouxipianyi/workbuddy2api-hub"', self.script)
+        self.assertIn('CONTINUATION_IMAGE="ghcr.io/huangdale522-gif/workbuddy2api-hub"', self.script)
+        self.assertIn('s|${LEGACY_IMAGE}|${CONTINUATION_IMAGE}|g', self.script)
+        self.assertIn("docker-compose.yml.bak-continuation-", self.script)
+
     def test_public_mode_explains_the_reverse_proxy_requirement(self):
         self.assertIn("请用 Nginx / Caddy / Cloudflare Tunnel 反代", self.script)
         self.assertIn("WB_DEPLOY_MODE=public bash", self.readme)
