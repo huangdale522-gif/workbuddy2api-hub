@@ -9,6 +9,9 @@ Run with: python _test_release_engineering.py
 """
 import os
 import re
+import contextlib
+import importlib.util
+import io
 import unittest
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -27,6 +30,33 @@ class VersionStringTests(unittest.TestCase):
         self.assertIsNotNone(overview, "overview version string not found")
         self.assertIsNotNone(server, "server header version string not found")
         self.assertEqual(overview.group(1), server.group(1))
+
+
+class CoreProbeTests(unittest.TestCase):
+    def setUp(self):
+        path = os.path.join(ROOT, "scripts", "probe_core_interfaces.py")
+        spec = importlib.util.spec_from_file_location("probe_core_interfaces", path)
+        self.probe = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.probe)
+
+    def add(self, status, **kwargs):
+        report = self.probe.Report()
+        with contextlib.redirect_stdout(io.StringIO()):
+            report.add("probe", "route", status, 0.01, **kwargs)
+        return report.rows[0]
+
+    def test_normal_routes_require_a_success_status(self):
+        self.assertTrue(self.add(200)["ok"])
+        self.assertFalse(self.add(503)["ok"])
+
+    def test_generic_expected_error_remains_a_4xx_assertion(self):
+        self.assertTrue(self.add(400, expected=True)["ok"])
+        self.assertFalse(self.add(503, expected=True)["ok"])
+
+    def test_expected_status_accepts_configured_and_unconfigured_codearts(self):
+        self.assertTrue(self.add(200, expected_status=(200, 503))["ok"])
+        self.assertTrue(self.add(503, expected_status=(200, 503))["ok"])
+        self.assertFalse(self.add(500, expected_status=(200, 503))["ok"])
 
 
 class WorkflowTests(unittest.TestCase):
