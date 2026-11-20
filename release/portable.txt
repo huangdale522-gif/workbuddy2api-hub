@@ -67,6 +67,7 @@ wb_catalog.py
 wb_codearts.py
 wb_codearts_crypto.py
 wb_egress.py
+wb_external_api.py
 wb_fingerprint.py
 wb_identity.py
 wb_ipintel.py
@@ -87,6 +88,7 @@ wb_scheduler.py
 wb_settings.py
 wb_tasks.py
 wb_usage_io.py
+wb_usage_board.py
 wb_tiers.py
 wb_time.py
 wb_updates.py
