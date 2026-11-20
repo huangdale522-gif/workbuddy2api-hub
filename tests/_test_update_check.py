@@ -99,6 +99,10 @@ def checker(directory, fetcher, **kwargs):
 
 
 class SettingsContractTests(unittest.TestCase):
+    def test_default_repository_points_to_current_maintainer(self):
+        self.assertEqual(wb_updates.DEFAULT_REPOSITORY,
+                         "huangdale522-gif/workbuddy2api-hub")
+
     def test_missing_key_reads_as_off(self):
         with tempfile.TemporaryDirectory(prefix="upd-set-") as d:
             self.assertFalse(wb_settings.update_check_enabled(d))
