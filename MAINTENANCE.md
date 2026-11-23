@@ -2,8 +2,8 @@
 
 本仓库是 `workbuddy2api-hub` 的社区续维护分支，当前源码已同步原作者迁移后的稳定版：
 
-- 当前同步版本：`v2.1.7`
-- 当前同步提交：`99ebbeb4a6df10ae76165a634debc16e8de33479`
+- 当前同步版本：`v2.2.2`
+- 当前同步提交：`e945d95aa1bc33a783d865135c58b49c652efecd`
 - 历史基线：`v2.1.1` / `f5f15d33d401e590b3869017beb480a54a91de7a`
 - 迁移后的上游：`niyouqianma/workbuddy2api-hub`
 - 历史原地址：`ardeyouxipianyi/workbuddy2api-hub`（当前不可访问）
