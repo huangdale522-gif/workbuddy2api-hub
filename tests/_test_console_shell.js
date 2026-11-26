@@ -236,6 +236,20 @@ check(/id="acctSelAll"[^>]*onchange="toggleAcctSelAll\(this\)"/.test(html),
   '表头缺少全选勾选框');
 check(!/id="btnSelectFiltered"/.test(html),
   '「全选筛选结果」独立按钮应已移除（全选只在表头复选框）');
+check(/id="accountActionScope"[^>]*aria-live="polite"/.test(html)
+      && /function updateAccountActionScope\(\)\{[\s\S]*?const scope = acctScopeUids\(\)/.test(script),
+  '账号操作范围提示应与批量操作使用同一份账号集合');
+check(/id="btnAcctMore"[^>]*aria-controls="acctAdvancedTools"/.test(html),
+  '收起后的账号操作应仍有可访问的展开入口');
+
+const settingsPage = html.slice(html.indexOf('<div id="pageSettings"'), html.indexOf('<div id="pageApi"'));
+check(settingsPage.includes('id="settingsSearch"'), '设置页缺少跨组搜索入口');
+for(const [group, stateId] of [['model', 'setModelAliasesEnabledState'], ['api', 'setWebGatewayState']]){
+  const section = [...settingsPage.matchAll(/<section\b[^>]*>[\s\S]*?<\/section>/g)]
+    .map(match => match[0]).find(text => text.includes('id="' + stateId + '"'));
+  check(section && section.split('>')[0].includes('data-settings-group="' + group + '"'),
+    '设置项 ' + stateId + ' 应通过明确的属性归到 ' + group);
+}
 
 // ---- 3. 概览：用已有数据，不发新请求，也不冒充时间序列 ---------------
 

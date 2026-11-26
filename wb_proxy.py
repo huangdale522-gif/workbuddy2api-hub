@@ -12807,6 +12807,8 @@ def runtime_settings_view():
         "asr_enabled": wb_settings.audio_enabled(ACCOUNTS_DIR, "asr"),
         "model_aliases": wb_settings.model_aliases(ACCOUNTS_DIR),
         "model_aliases_enabled": wb_settings.model_aliases_enabled(ACCOUNTS_DIR),
+        "unified_models": wb_settings.unified_models(ACCOUNTS_DIR),
+        "unified_models_enabled": wb_settings.unified_models_enabled(ACCOUNTS_DIR),
         "filter_models_by_key": wb_settings.filter_models_by_key(ACCOUNTS_DIR),
         "reasoning_effort_map": wb_settings.reasoning_effort_map(ACCOUNTS_DIR),
         "models_only_available": wb_settings.models_only_available(ACCOUNTS_DIR),
@@ -12838,6 +12840,8 @@ def runtime_settings_view():
         "daily_chat_models_max": wb_settings.DAILY_CHAT_MODELS_MAX,
         "daily_chat_prefer_flash":
             wb_settings.daily_chat_prefer_flash(ACCOUNTS_DIR),
+        "cn_rewards_random_enabled":
+            wb_settings.cn_rewards_random_enabled(ACCOUNTS_DIR),
         "daily_chat_budget": wb_settings.daily_chat_budget(
             ACCOUNTS_DIR, default=wb_accounts.WEB_BUDGET_DEFAULT),
         "daily_chat_budget_default": wb_accounts.WEB_BUDGET_DEFAULT,
@@ -12914,7 +12918,7 @@ def runtime_settings_view():
         "accounts_dir": ACCOUNTS_DIR,
         "usage_dir": USAGE_DIR,
         "settings_file": wb_settings.settings_path(ACCOUNTS_DIR),
-        "version": "2.2.2",
+        "version": "2.2.4",
     }
 def current_account():
     """Account used for display purposes (health / usage summaries)."""
@@ -13880,6 +13884,58 @@ def alias_model_entries(data, aliases):
     return data + extra
 
 
+def advertise_unified_models(data, unified, realm):
+    """Append client-facing unified names next to their per-exit target.
+
+    Parallel to alias_model_entries(): only advertise a name when this exit
+    actually serves its target, so the client never sees a name that fails on
+    the first call. Does not mutate ``data``.
+    """
+    if not unified or not isinstance(data, list):
+        return data
+    realm_key = str(realm or "").strip().lower()
+    by_id = {}
+    for item in data:
+        if isinstance(item, dict) and item.get("id"):
+            by_id.setdefault(str(item["id"]), item)
+    seen = set(by_id)
+    extra = []
+    for name, mapping in unified.items():
+        target = (mapping or {}).get(realm_key)
+        if not target or name in seen:
+            continue
+        source = by_id.get(str(target))
+        if source is None:
+            continue
+        entry = dict(source)
+        entry["id"] = name
+        if source.get("name"):
+            entry["name"] = name
+        extra.append(entry)
+        seen.add(name)
+    return data + extra
+
+
+def resolve_unified_model_in_payload(payload, realm):
+    """Resolve one client-facing unified name for the request's exit.
+
+    All protocol entry points call this before translation: chat,
+    /v1/responses, and Anthropic Messages otherwise carry the client-facing
+    name straight to an upstream that only knows the real id. The original
+    name stays on the handler for key restrictions and reply echoing.
+    """
+    if not isinstance(payload, dict):
+        return payload
+    if "model" not in payload:
+        return payload
+    try:
+        payload["model"] = wb_settings.resolve_unified_model(
+            payload.get("model"), realm, ACCOUNTS_DIR)
+    except Exception:
+        pass
+    return payload
+
+
 def model_entry(mid, meta, realm=None):
     """Build a rich /v1/models entry from the desktop app catalog metadata.
     The OpenAI spec only names id/object/created/owned_by, so capability data is
@@ -14660,6 +14716,16 @@ SANITIZE_CLAUDE_CODE_INTRO_RE = re.compile(
     r"(?: tool)? for Claude(?: Code)?\.?")
 SANITIZE_CLAUDE_CODE_INTRO_REPLACEMENT = "You are a helpful AI assistant."
 SANITIZE_CLAUDE_CODE_LOWER = "you are claude code,"
+# Trae（TraeCode）自述首句（2026-11-24 本机 CN 号池实测）：
+#   You are an interactive agent in TraeCode that helps the USER ...
+# 上游按「interactive agent in TraeCode」这一连续短语判非官方渠道，命中即
+# 400 / 11128。逐条二分：单独 `TraeCode`、`in Trae IDE`、`in Cursor` 均 200；
+# 只删掉 `in TraeCode` 后，真实 23KB system（21 个工具）整体 200。因此只删这
+# 一段短语，句子其余部分与 Trae 的行为指令原样保留。
+SANITIZE_TRAECODE_RE = re.compile(
+    r"(?i)You are an interactive agent in\s+TraeCode\b")
+SANITIZE_TRAECODE_REPLACEMENT = "You are an interactive agent"
+SANITIZE_TRAECODE_LOWER = "interactive agent in traecode"
 # 真实形态是一整行，尾部还有 `cch=` 这类不以前缀 `cc_` 开头的参数；按行删除，
 # 避免只删到第一个分号后把 `x-anthropic-billing-header:` 留在出站文本里。
 SANITIZE_HDR_LINE_RE = re.compile(
@@ -14793,6 +14859,10 @@ def has_fingerprint(text, identity=True, billing=True):
     # SANITIZE_FEATURES 只登记了首字母大写的 "You are Claude Code"；这里用
     # 小写字面量补齐大小写混排的 system 文本，命中后才走 sanitize_text 的正则。
     if SANITIZE_CLAUDE_CODE_LOWER in low:
+        return True
+    # TraeCode 自述句：廉价字面量探测，命中才走正则。
+    if (SANITIZE_TRAECODE_LOWER in low
+            and SANITIZE_TRAECODE_RE.search(text) is not None):
         return True
     # 品牌词缩减：`harness` 是廉价前置筛，真命中交给正则。
     if (SANITIZE_BRAND_LOWER in low
@@ -14940,6 +15010,8 @@ def sanitize_text(text, identity=True, billing=True):
             SANITIZE_CLAUDE_CODE_INTRO_REPLACEMENT, text)
         # Codex 自述首段先整句换掉：它本身就是 SANITIZE_FEATURES 里的指纹。
         text = SANITIZE_CODEX_INTRO_RE.sub(SANITIZE_CODEX_INTRO_REPLACEMENT, text)
+        # Trae（TraeCode）自述句：只删 "in TraeCode" 这段渠道指纹。
+        text = SANITIZE_TRAECODE_RE.sub(SANITIZE_TRAECODE_REPLACEMENT, text)
         text = SANITIZE_IDENTITY_RE.sub(SANITIZE_IDENTITY_REPLACEMENT, text)
         # GUI 描述段单独一条规则：锚定整句，只调整句尾语序。
         text = SANITIZE_DSH_GUI_RE.sub(SANITIZE_DSH_GUI_REPLACEMENT, text)
@@ -15336,9 +15408,13 @@ def repack_tool_result_blocks(messages):
             role = mm.get("role")
             if role == "tool":
                 tid = mm.get("tool_call_id")
-                if not (isinstance(tid, str) and tid in want):
-                    break
-                results.append(mm)
+                if isinstance(tid, str) and tid in want:
+                    results.append(mm)
+                else:
+                    # Keep scanning past an orphan result: it will be removed
+                    # by cleanup_orphan_tool_calls, and it must not hide a
+                    # valid result that follows it.
+                    between.append(mm)
                 i += 1
                 continue
             # Any assistant message ends this batch. A message that is not a
@@ -15412,12 +15488,17 @@ def cleanup_orphan_tool_calls(messages):
         else:
             m.pop("tool_calls", None)
     out = []
+    seen_results = set()
     for m in messages:
         if isinstance(m, dict) and m.get("role") == "tool":
             tid = m.get("tool_call_id")
             if not (isinstance(tid, str) and tid in keep):
                 changed = True
                 continue
+            if tid in seen_results:
+                changed = True
+                continue
+            seen_results.add(tid)
         out.append(m)
     if not changed:
         return messages, False
@@ -18261,6 +18342,24 @@ def rate_limit_is_cap(detail):
         return False
 
 
+# 上游 429 / code 14018：账号积分已耗尽。它不是凭证失效，也不是某个模型的
+# 短暂频率限制；同一账号的付费请求都会继续失败，应走余额保护。
+CREDIT_EXHAUSTED_CODE = 14018
+
+
+def rate_limit_is_credit_exhausted(detail):
+    """True when a 429 explicitly says the account's credits are exhausted."""
+    try:
+        if int(rate_limit_code(detail)) == CREDIT_EXHAUSTED_CODE:
+            return True
+    except (TypeError, ValueError):
+        pass
+    text = (detail or "").lower()
+    return any(marker in text for marker in (
+        "credits exhausted", "credit exhausted", "insufficient credits",
+        "额度已用尽", "积分已用尽"))
+
+
 def rate_limit_is_account_level(detail, reset_at):
     """True only with positive evidence that the 429 is credential-scoped.
 
@@ -19029,6 +19128,15 @@ def open_upstream(payload, session_key=None, target_realm=None, prebuilt_body=No
                 except Exception:
                     detail = ""
                 reset_at = parse_rate_limit_reset(detail)
+                if rate_limit_is_credit_exhausted(detail):
+                    account.note_balance_cooled(
+                        "HTTP 429 (credits exhausted)", detail=detail)
+                    log("account %s credits exhausted (429/14018), parked until 04:00"
+                        % account.uid[:8])
+                    if session_key and POOL:
+                        POOL.affinity.demote(session_key, account.uid)
+                    last_error = exc
+                    continue
                 if rate_limit_is_account_level(detail, reset_at):
                     wait = account.note_soft_rate("HTTP 429 (account soft rate)")
                     log("account %s soft-rate limited (%r), cooling %.0fs (streak %d)"
@@ -19757,6 +19865,12 @@ def probe_account(account, model=None, timeout=30):
         # pool while every dispatch bounces (#435's exemption is not meant to
         # cover a gateway that names the credential as bad).
         row["error"] = wb_accounts.http_error_message(exc, detail, 150)
+        if exc.code == 429 and rate_limit_is_credit_exhausted(detail):
+            account.note_balance_cooled(
+                "HTTP 429 (credits exhausted)", detail=detail)
+            row["balanceProtected"] = True
+            row["fails"] = int(account.fails)
+            return row
         if exc.code == 403 and restriction_is_account_level(detail):
             # 测试也认账号级封禁：命中即持久禁用，只有操作者手动启用才解除。
             # 一并记连坐事件：一键测试正好是发现「整池被清扫」的入口。
@@ -20820,6 +20934,21 @@ def _responses_input_to_messages(payload):
                 target.get("reasoning_content"), pending_reasoning)
             pending_reasoning = ""
 
+    def append_tool_result(call_id, content):
+        nonlocal assistant_target
+        messages.append({
+            "role": "tool",
+            "tool_call_id": call_id or "",
+            "content": content,
+        })
+        # A tool result belongs to the declaration that preceded it. Keep the
+        # assistant target so a later function_call in the same Responses
+        # batch is appended to that same assistant message instead of starting
+        # a second one. The Chat repair pass can recover most shapes, but the
+        # replay boundary marker prevents a second declaration from being
+        # merged when the client deliberately starts a new turn.
+        pending_reasoning = ""
+
     if isinstance(inp, str):
         messages.append({"role": "user", "content": inp})
     elif isinstance(inp, list):
@@ -20974,12 +21103,7 @@ def _responses_input_to_messages(payload):
                     content = raw_out
                 else:
                     content = str(raw_out)
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": item.get("call_id") or "",
-                    "content": content,
-                })
-                pending_reasoning = ""
+                append_tool_result(item.get("call_id") or "", content)
             elif itype == "function_call":
                 tc_item = {
                     "id": item.get("call_id") or item.get("id") or "",
@@ -21017,12 +21141,7 @@ def _responses_input_to_messages(payload):
                     content = raw_out
                 else:
                     content = str(raw_out)
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": item.get("call_id") or "",
-                    "content": content,
-                })
-                pending_reasoning = ""
+                append_tool_result(item.get("call_id") or "", content)
             elif itype == "agent_message":
                 parts = item.get("content")
                 if isinstance(parts, list):
@@ -22871,7 +22990,7 @@ class Handler(BaseHTTPRequestHandler):
             super().finish()
         except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError):
             pass
-    server_version = "wb-proxy/2.2.2"
+    server_version = "wb-proxy/2.2.4"
     def log_message(self, fmt, *args):
         # 静默过滤前端看板高频定时心跳的正常 200 GET 请求（/logs、/usage、/accounts 轮询等）
         # 避免自增死循环刷屏与日志污染。遇 4xx/5xx 异常或所有非 GET 业务操作依然如实记录。
@@ -24309,6 +24428,16 @@ class Handler(BaseHTTPRequestHandler):
         # alias_model_entries): clients that discover the catalogue must be
         # able to see the name they are expected to send.
         data = alias_model_entries(data, aliases)
+        # Advertise unified names next to their per-exit target, the same way
+        # operator aliases are advertised: a client that discovers the
+        # catalogue must see the single name it is expected to send.
+        try:
+            unified = wb_settings.effective_unified_models(ACCOUNTS_DIR)
+        except Exception:
+            unified = {}
+        if unified:
+            data = advertise_unified_models(
+                data, unified, req_realm or CURRENT_REALM)
         payload = {"object": "list", "data": data,
                    "realm": req_realm or CURRENT_REALM}
         # 来源说明（面板展示用）：这批清单是上游 API 实时取的，还是读的
@@ -26558,6 +26687,20 @@ class Handler(BaseHTTPRequestHandler):
                                    "invalid_request_error")
             wb_settings.set_model_aliases_enabled(ACCOUNTS_DIR, raw)
             reply["model_aliases_enabled"] = raw
+        if "unified_models" in payload:
+            try:
+                cleaned = wb_settings.set_unified_models(
+                    ACCOUNTS_DIR, payload.get("unified_models"))
+            except ValueError as exc:
+                return self._error(400, str(exc), "invalid_request_error")
+            reply["unified_models"] = cleaned
+        if "unified_models_enabled" in payload:
+            raw = payload.get("unified_models_enabled")
+            if not isinstance(raw, bool):
+                return self._error(400, "unified_models_enabled must be true or false",
+                                   "invalid_request_error")
+            wb_settings.set_unified_models_enabled(ACCOUNTS_DIR, raw)
+            reply["unified_models_enabled"] = raw
         if "filter_models_by_key" in payload:
             raw = payload.get("filter_models_by_key")
             if not isinstance(raw, bool):
@@ -26714,6 +26857,12 @@ class Handler(BaseHTTPRequestHandler):
                     "invalid_request_error")
             reply["daily_chat_models"] = \
                 wb_settings.set_daily_chat_models(ACCOUNTS_DIR, raw)
+        if "cn_rewards_random_enabled" in payload:
+            try:
+                reply["cn_rewards_random_enabled"] = wb_settings.set_cn_rewards_random_enabled(
+                    ACCOUNTS_DIR, payload["cn_rewards_random_enabled"])
+            except ValueError as exc:
+                return self._error(400, str(exc), "invalid_request_error")
         if "daily_chat_prefer_flash" in payload:
             raw = payload.get("daily_chat_prefer_flash")
             if not isinstance(raw, bool):
@@ -29038,6 +29187,9 @@ class Handler(BaseHTTPRequestHandler):
                 "store response state. Send the full conversation in 'input' "
                 "instead, or use a stateless client.",
                 "invalid_request_error")
+        explicit_realm = self._request_realm()
+        req_realm = explicit_realm or CURRENT_REALM
+        resolve_unified_model_in_payload(payload, req_realm)
         session_key = extract_session_key(self.headers, payload)
         # 工具可能在顶层，也可能整份在 input 的 additional_tools 条目里。回程
         # 的两处取值（custom_names 判定条目类型、request_meta 回显工具清单）
@@ -29072,8 +29224,6 @@ class Handler(BaseHTTPRequestHandler):
                sorted(custom_names) or "-", compaction, key_label(self._key_id()) or "-")
         )
         try:
-            explicit_realm = self._request_realm()
-            req_realm = explicit_realm or CURRENT_REALM
             blocked = self._cross_realm_error(chat_req.get("model"), req_realm)
             if blocked:
                 return self._error(400, blocked, "invalid_request_error")
@@ -29424,6 +29574,9 @@ class Handler(BaseHTTPRequestHandler):
 
     def _handle_messages(self, payload):
         """Serve an Anthropic Messages request through the chat pipeline."""
+        explicit_realm = self._request_realm()
+        req_realm = explicit_realm or CURRENT_REALM
+        resolve_unified_model_in_payload(payload, req_realm)
         web_meta = None
         try:
             import wb_webgateway
@@ -29460,8 +29613,6 @@ class Handler(BaseHTTPRequestHandler):
                chat_req.get("reasoning_effort"), len(chat_req.get("tools") or []),
                key_label(self._key_id()) or "-"))
         try:
-            explicit_realm = self._request_realm()
-            req_realm = explicit_realm or CURRENT_REALM
             blocked = self._cross_realm_error(chat_req.get("model"), req_realm)
             if blocked:
                 return self._anthropic_error(400, blocked, "invalid_request_error")
@@ -29929,18 +30080,17 @@ class Handler(BaseHTTPRequestHandler):
             return self._handle_audio_post(path, payload)
         if is_media_route:
             return self._handle_media_post(path, payload)
-        try:
-            aliases = wb_settings.effective_model_aliases(ACCOUNTS_DIR)
-        except Exception:
-            aliases = {}
-        # The key's model restriction is expressed in the names the client
-        # sends, and an operator alias is exactly such a name. Remember it
-        # before the rewrite so `_key_model_error` can accept either spelling
-        # (see its docstring).
+        # Operator aliases and unified names are client-facing. Remember the
+        # original before either rewrite so key restrictions and reply echoing
+        # can accept the name the client actually sent.
         try:
             self._client_model = str(payload.get("model") or "")
         except Exception:
             self._client_model = ""
+        try:
+            aliases = wb_settings.effective_model_aliases(ACCOUNTS_DIR)
+        except Exception:
+            aliases = {}
         _apply_model_aliases(payload, aliases)
         _apply_background_model_alias(payload)
         # 日 token 限量（单位 M，0/缺省 = 不限）。放在并发槽位之前判断：
@@ -30039,6 +30189,11 @@ class Handler(BaseHTTPRequestHandler):
         t_start = time.time()
         explicit_realm = self._request_realm()
         req_realm = explicit_realm or CURRENT_REALM
+        # Unified model (off by default): resolve the client-facing name into
+        # this exit's real id *after* the realm is known but before any
+        # key/banned/disabled check, so a model closed on another exit cannot
+        # leak here. _client_model still holds the original for key checks.
+        resolve_unified_model_in_payload(payload, req_realm)
         if req_realm == "codearts":
             blocked = self._banned_model_error(payload.get("model")) or self._key_model_error(payload.get("model"))
             if blocked:

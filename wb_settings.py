@@ -1192,7 +1192,7 @@ def set_keep_backups(accounts_dir, value):
     return keep
 
 
-#: 后台排程时段（CST 24 小时制）。默认值与旧版硬编码完全一致，老安装行为不变。
+#: Default hourly schedule, in the scheduler's existing local time.
 DEFAULT_SCHEDULE_HOURS = {
     "checkin": [9, 21],
     "travel": [9, 21],
@@ -1263,12 +1263,9 @@ def set_schedule_hours(accounts_dir, value):
                 if hours is None:
                     raise ValueError("schedule.%s must contain hours 0-23" % key)
                 merged[key] = hours
-            else:
-                hours = _normalize_hours(current.get(key))
-                merged[key] = hours if hours is not None else list(DEFAULT_SCHEDULE_HOURS[key])
         data["schedule"] = merged
         save(accounts_dir, data)
-    return merged
+        return dict(merged, **schedule_hours(accounts_dir))
 
 
 #: 网页活跃（国际版每日活跃）的独立时段，HH:MM。空表示跟随 checkin 整点，
@@ -1494,6 +1491,108 @@ def set_model_aliases(accounts_dir, raw):
         data[MODEL_ALIASES_KEY] = cleaned
         save(accounts_dir, data)
     return cleaned
+# ---------------------------------------------------------------------------
+# 出口感知的统一模型（unified models）
+#
+# 与 operator alias 的区别：alias 是「一个别名 → 一个固定目标名」，不区分出口；
+# unified model 是「一个对外名 → 按出口解析成不同的真实 model id」：把 WB CN 的
+# deepseek-v4.1-flash 与 CodeArts 的 deepseek-v4.1-flash-1017 对外统一成一个
+# 名字，同时让各出口的关闭状态（disabledModels / key 限制）互不串扰。
+# 默认关：老安装的 settings.json 没有这些键，行为与从前逐字节一致。
+# ---------------------------------------------------------------------------
+UNIFIED_MODELS_KEY = "unified_models"
+UNIFIED_MODELS_ENABLED_KEY = "unified_models_enabled"
+MAX_UNIFIED_MODELS = 200
+MAX_UNIFIED_MODEL_LEN = 200
+#: 允许出现在 unified_models.<name> 下的出口键；未知出口会被清理掉。
+_UNIFIED_REALMS = frozenset(("cn", "intl", "codearts"))
+
+
+def _clean_unified_models(raw):
+    """归一化为 ``{lowercase 对外名: {realm: 真实 model id}}``。
+
+    接受对象形状；坏条目一律忽略，绝不让一份手改的设置文件把网关打挂。
+    每个名字下至少要有一个合法 (realm, target) 对才会保留。
+    """
+    out = {}
+    if not isinstance(raw, dict):
+        return out
+    for name, realms in raw.items():
+        key = str(name or "").strip().lower()
+        if not key or len(key) > MAX_UNIFIED_MODEL_LEN or not isinstance(realms, dict):
+            continue
+        mapping = {}
+        for realm, target in realms.items():
+            r = str(realm or "").strip().lower()
+            t = str(target or "").strip()
+            if r in _UNIFIED_REALMS and t and len(t) <= MAX_UNIFIED_MODEL_LEN:
+                mapping[r] = t
+        if mapping:
+            out[key] = mapping
+    return out
+
+
+def unified_models(accounts_dir):
+    """读取原始统一模型表（不看开关；面板在关着时也要能编辑）。"""
+    raw = load(accounts_dir).get(UNIFIED_MODELS_KEY)
+    return _clean_unified_models(raw)
+
+
+def unified_models_enabled(accounts_dir):
+    """统一模型层是否启用；缺键按关。"""
+    return load(accounts_dir).get(UNIFIED_MODELS_ENABLED_KEY) is True
+
+
+def set_unified_models_enabled(accounts_dir, enabled):
+    enabled = bool(enabled)
+    with _lock:
+        data = load(accounts_dir)
+        data[UNIFIED_MODELS_ENABLED_KEY] = enabled
+        save(accounts_dir, data)
+    return enabled
+
+
+def effective_unified_models(accounts_dir):
+    """开关关着时返回空表；所有消费者都走这里。"""
+    if not unified_models_enabled(accounts_dir):
+        return {}
+    return unified_models(accounts_dir)
+
+
+def set_unified_models(accounts_dir, raw):
+    """落盘并回读归一化后的表；超上限或名字过长直接拒绝。"""
+    cleaned = _clean_unified_models(raw)
+    if len(cleaned) > MAX_UNIFIED_MODELS:
+        raise ValueError("unified model table holds at most %d entries"
+                         % MAX_UNIFIED_MODELS)
+    with _lock:
+        data = load(accounts_dir)
+        data[UNIFIED_MODELS_KEY] = cleaned
+        save(accounts_dir, data)
+    return cleaned
+
+
+def resolve_unified_model(name, realm, directory):
+    """按出口把对外统一名解析成真实 model id。
+
+    - 非统一名 / 表为空 / 开关关闭：原样返回（逐字节不变）。
+    - 该出口没有映射：原样返回，让上游按原 id 处理。
+    调用方应在 realm 已经确定之后调用本函数。
+    """
+    if not isinstance(name, str) or not name.strip():
+        return name
+    r = str(realm or "").strip().lower()
+    if not r:
+        return name
+    table = effective_unified_models(directory)
+    if not table:
+        return name
+    mapping = table.get(name.strip().lower())
+    if not mapping:
+        return name
+    return mapping.get(r, name)
+
+
 # 清单写进客户端配置后会被逐条展开；200 条已远超任何出口的模型数，上限只挡
 # 手编 settings.json 把客户端配置撑爆。
 MAX_AGENT_MODELS = 200
@@ -2779,6 +2878,80 @@ DAILY_CHAT_RANDOM_KEY = "daily_chat_random"
 DAILY_CHAT_STARTUP_CATCHUP_KEY = "daily_chat_startup_catchup"
 DAILY_CHAT_WEB_FALLBACK_ACTIVITY_KEY = "daily_chat_web_fallback_activity"
 DAILY_CHAT_PREFER_FLASH_KEY = "daily_chat_prefer_flash"
+
+#: 国内版签到 + 猫猫旅行的每日随机时段窗口（CST，左闭右开）。默认 08:00–09:59。
+CN_REWARDS_WINDOW = (8, 10)
+CN_REWARDS_RANDOM_KEY = "cn_rewards_random"
+
+
+def _draw_cn_rewards_time():
+    """在 CN_REWARDS_WINDOW 里抽一个分钟级时刻，返回 "HH:MM"。"""
+    start = CN_REWARDS_WINDOW[0] * 60
+    end = CN_REWARDS_WINDOW[1] * 60
+    if end <= start:
+        start, end = 8 * 60, 10 * 60
+    minute = random.randint(start, end - 1)
+    return "%02d:%02d" % (minute // 60, minute % 60)
+
+
+def cn_rewards_random_enabled(accounts_dir):
+    return load(accounts_dir).get("cn_rewards_random_enabled") is True
+
+
+def set_cn_rewards_random_enabled(accounts_dir, enabled):
+    if not isinstance(enabled, bool):
+        raise ValueError("cn_rewards_random_enabled must be true or false")
+    with _lock:
+        data = load(accounts_dir)
+        data["cn_rewards_random_enabled"] = enabled
+        save(accounts_dir, data)
+    return enabled
+
+
+def cn_rewards_day_start(now):
+    """Beijing midnight as epoch seconds, independent of the statistics timezone."""
+    offset = wb_time.BEIJING_OFFSET
+    return ((int(now) + offset) // 86400) * 86400 - offset
+
+
+def cn_rewards_date(now):
+    return time.strftime("%Y-%m-%d", time.gmtime(now + wb_time.BEIJING_OFFSET))
+
+
+def cn_rewards_schedule(accounts_dir, now):
+    """Return the tasks with no hourly override and today's persisted slot."""
+    with _lock:
+        data = load(accounts_dir)
+        if data.get("cn_rewards_random_enabled") is not True:
+            return (), {}
+        schedule = data.get("schedule")
+        if not isinstance(schedule, dict):
+            schedule = {}
+        tasks = tuple(key for key in ("checkin", "travel")
+                      if _normalize_hours(schedule.get(key)) is None)
+        if not tasks:
+            return (), {}
+        today = cn_rewards_date(now)
+        state = data.get(CN_REWARDS_RANDOM_KEY)
+        if (not isinstance(state, dict) or state.get("date") != today
+                or not isinstance(state.get("time"), str)
+                or not _normalize_times([state["time"]])):
+            state = {"date": today, "time": _draw_cn_rewards_time()}
+            data[CN_REWARDS_RANDOM_KEY] = state
+            save(accounts_dir, data)
+        return tasks, state
+
+
+def complete_cn_rewards(accounts_dir, date, tasks, pending):
+    with _lock:
+        data = load(accounts_dir)
+        state = data.get(CN_REWARDS_RANDOM_KEY)
+        if not isinstance(state, dict) or state.get("date") != date:
+            return
+        done = set(state.get("done") or ()) | set(tasks)
+        data[CN_REWARDS_RANDOM_KEY] = dict(state, done=sorted(done),
+                                           pending=sorted(pending))
+        save(accounts_dir, data)
 
 
 def _clean_models(value):
