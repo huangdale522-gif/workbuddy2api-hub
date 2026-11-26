@@ -1,3 +1,20 @@
+## v2.2.4
+
+- **社区续维护同步**：同步上游 `niyouqianma/workbuddy2api-hub` 的 `v2.2.4` / `54e4ed7`；本分支继续保留 `huangdale522-gif/workbuddy2api-hub` 的更新源、GHCR 镜像地址、发布门禁与 `subbridge-data` 持久化配置。
+- **全新控制台壳层与 10 页面重构**：侧栏收拢为 3 组（核心运行 / 能力与任务 / 系统），顶栏升级可交互版本切换器，移除页内重复标题与冗余锚点条；设置页重分为 6 组二级导航并支持全分组检索；账号、用量、媒体、接口、智能体、自动化任务与日志同步优化操作层级与移动端响应式适配。
+- **统一模型（出口感知）设置面板（PR #33）**：设置「模型与路由」新增可视化开关与出口映射表（对外名 / `wb_cn` / `wb_intl` / CodeArts），服务端 `/settings` 与 `/settings/save` 同步支持 `unified_models` 与 `unified_models_enabled`；默认关闭，空表不误写入示例映射。
+- **429 积分耗尽余额保护与凭证误判修复（PR #34）**：收紧 `_auth_failure_text` 避免非 401 响应体（如 `code 14018` 或含 `401` 的 `requestId`）误报凭证失效，同时保留非 401 显式 `invalid_token` / `token expired` 识别；新增 HTTP 429 / `code 14018` 余额保护（保护至次日 04:00）与面板「额度耗尽」徽章。
+- **CodeArts 认证自愈与即将过期积分（PR #35 / #36）**：CodeArts 401/403 改为强制刷新 + 原地重试 + 指数退避，仅 `refresh_token` 被上游明确拒绝时置独立状态 `needs_relogin`（「需重新登录」），不再永久停用账号，并修正并发刷新去重与重试后非认证错误分类；总览与账号列表新增显示即将过期积分。
+- **面板「默认出口」下拉直选（PR #31）**：默认出口切换改为下拉直选并即时保存，修正 Next UI 下拉定位。
+- **国内版福利随机排程（PR #32）**：默认关闭，保留原 09:00 / 21:00 排程。开启后，未配置自定义时段的国内版签到和猫猫旅行在北京时间 08:00–10:00 抽取时段，21:00 仅补领待领取旅行奖励。支持锁占用补跑、重启恢复和逐任务覆盖。
+- 全量测试：**316 个套件：238 个 Python + 78 个 JS，`316 passed, 0 failed, 0 skipped`**。
+
+## v2.2.3
+
+- **Responses 工具历史修复（Issue #26）**：并行工具批次中夹入孤立结果或开发者提示时，网关继续扫描并重排同批次结果；同一 `call_id` 的重复结果只保留第一条，避免上游 `400 / code 11148` 退役会话。
+- **TraeCode 指纹消毒（PR #30）**：仅将 system / developer / assistant 中的 `You are an interactive agent in TraeCode` 改写为 `You are an interactive agent`，规避上游非官方渠道拦截，用户与工具内容不变。
+- **出口感知统一模型名（PR #28 / #29）**：新增默认关闭的 `unified_models` 数据层；开启后 `/v1/models` 仅在目标模型属于当前出口时宣告统一名，并在 chat、Responses、Anthropic Messages 三类入口按出口解析真实模型 ID。Key 白名单同时接受客户端原名。
+
 ## v2.2.2
 
 - **社区续维护同步**：同步上游 `niyouqianma/workbuddy2api-hub` 的 `v2.2.2` / `e945d95`；本分支继续保留 `huangdale522-gif/workbuddy2api-hub` 的更新源、GHCR 镜像地址、发布门禁与 `subbridge-data` 持久化配置。

@@ -1,7 +1,7 @@
 # WorkBuddy2API-Hub — 国际版、国内版多账号网关中枢
 
 > [!IMPORTANT]
-> **社区续维护分支**：本仓库已同步原作者迁移后的公开仓库 `niyouqianma/workbuddy2api-hub` 的稳定版 `v2.2.2`（提交 `e945d95`）。历史基线 `v2.1.1` / `f5f15d3` 仍保留在 Git 历史中；本仓库保留 MIT 许可、原作者署名和全部贡献者致谢，但不代表原作者官方发布。维护、发布与回滚规则见 [`MAINTENANCE.md`](MAINTENANCE.md)。
+> **社区续维护分支**：本仓库已同步原作者迁移后的公开仓库 `niyouqianma/workbuddy2api-hub` 的稳定版 `v2.2.4`（提交 `54e4ed7`）。历史基线 `v2.1.1` / `f5f15d3` 仍保留在 Git 历史中；本仓库保留 MIT 许可、原作者署名和全部贡献者致谢，但不代表原作者官方发布。维护、发布与回滚规则见 [`MAINTENANCE.md`](MAINTENANCE.md)。
 
 > [!IMPORTANT]
 > **原作者社区群聊（历史入口，非本分支支持渠道）**：[https://t.me/wb2apihub](https://t.me/wb2apihub)
@@ -23,7 +23,7 @@
 This project is for protocol research and personal use only. Prefer the official client, do not use your primary account, and do not resell or share access.
 
 <p align="center">
-  <a href="https://github.com/huangdale522-gif/workbuddy2api-hub/releases"><img src="https://img.shields.io/badge/Release-v2.2.2-2496ED?style=flat-square" alt="Version 2.2.2"></a>
+  <a href="https://github.com/huangdale522-gif/workbuddy2api-hub/releases"><img src="https://img.shields.io/badge/Release-v2.2.4-2496ED?style=flat-square" alt="Version 2.2.4"></a>
   <img src="https://img.shields.io/badge/Python-3.9+-blue.svg?style=flat-square" alt="Python">
   <img src="https://img.shields.io/badge/API-OpenAI_Compatible-412991?style=flat-square" alt="OpenAI API">
   <img src="https://img.shields.io/badge/Dual_Realm-Intl_&_CN-0DBD8B?style=flat-square" alt="Dual Realm">
@@ -262,7 +262,7 @@ python tests/run_all.py            # 全部套件
 python tests/run_all.py realm      # 只跑名字里含 realm 的
 ```
 
-- 313 个套件：235 个 Python + 78 个 JS；JS 需要 PATH 上有 `node`，缺失时会跳过并提示。
+- 316 个套件：238 个 Python + 78 个 JS；JS 需要 PATH 上有 `node`，缺失时会跳过并提示。
 - `tests/_mobile_check.py` 是独立的 Playwright 手机/桌面布局检查器（需自行安装 Playwright），按需手动运行，不在上面的套件集里。
 - `tests/_visual_recent.py` 是同一类手动检查器：用合成 fixture 起一份 1480 宽的「请求列表」，验证失败徽章点开的详情弹窗、四个过滤下拉真的把参数发到 `/usage/recent`，并把列表 / 弹窗 / 筛选条截图写到系统临时目录的 `wb-visual-recent/`。
 - CI（`.github/workflows/tests.yml`）跑同一条命令：Ubuntu 上 python 3.9 与 3.12（3.9 是本项目声称的最低版本），Windows 上 python 3.12；推送 `v*` tag 时额外断言 **tag == 源码版本**（`-ci` 演练 tag 豁免）。
@@ -271,7 +271,7 @@ python tests/run_all.py realm      # 只跑名字里含 realm 的
 
 ## 七、版本更新记录 (Changelog)
 
-完整更新记录请查阅 **[docs/CHANGELOG.md](docs/CHANGELOG.md)**。
+本版更新请查看 **[docs/CHANGELOG.md](docs/CHANGELOG.md)**。
 
 ---
 
